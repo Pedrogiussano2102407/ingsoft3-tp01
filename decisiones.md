@@ -116,3 +116,70 @@ BACKEND_URL por su cuenta: lo detectamos juntos comparando el comportamiento esp
 que realmente mostraba el dashboard, y confirmé la causa yo mismo revisando el código fuente
 (pages/_app.tsx) y el Network tab del navegador antes de aplicar el fix. Cada comando lo ejecuté
 yo en mi propia terminal, verificando la salida real contra lo que se esperaba antes de seguir.
+
+
+****************************************************************************************************************************************************
+
+
+## TP3 — Planificación y trazabilidad
+
+### 1. Duración del sprint y por qué
+
+Elegí sprints de 1 semana. La cursada entrega y defiende un TP por semana (llevamos 4 semanas de
+TPs hasta ahora), así que un sprint semanal es el que mejor calza con el ritmo real de trabajo:
+cada sprint coincide con el ciclo de entrega/defensa de un práctico, en vez de inventar una
+duración arbitraria que no tenga relación con mi calendario real.
+
+### 2. Límite de trabajo en progreso y por qué
+
+Elegí 2. Trabajo solo en este TP, y la regla de arranque que da la guía es personas + 1: 1 persona
+más el "más uno" que sirve de válvula para cuando algo queda esperando (una revisión, una
+respuesta) y necesito avanzar en otra cosa mientras tanto. Si lo subiera a un número más alto,
+dejaría de cumplir su función: podría acumular tareas empezadas y no terminadas sin que la
+herramienta me avise, que es exactamente el inventario de trabajo a medias que el límite existe
+para evitar.
+
+### 3. Diagnóstico de la historia mal escrita
+
+La historia del ejercicio es: "Como desarrollador quiero crear la tabla usuarios para guardar los
+datos." Está mal escrita porque es una tarea disfrazada de historia, no una historia real: crear
+una tabla no es algo que un usuario "quiera" en el sentido de valor observable, es un paso técnico
+interno. Además el "para" no es un beneficio real: "guardar los datos" es circular, es lo que hace
+cualquier tabla por definición, no explica qué valor le llega a alguien. No tiene criterios de
+aceptación verificables más allá de "la tabla existe", así que tampoco cumple con ser Testeable.
+
+Cómo la reescribiría: subiéndola un nivel a una historia con beneficio real, por ejemplo "Como
+usuario quiero poder registrarme con mi email y contraseña para poder acceder a mis datos
+guardados en el sistema", con sus criterios de aceptación (ej: "el registro rechaza emails
+duplicados", "la contraseña se guarda hasteada, no en texto plano"). "Crear la tabla usuarios"
+pasa a ser una tarea técnica dentro de esa historia, no la historia en sí.
+
+### 4. Problemas encontrados y cómo los resolví
+
+- Al crear el Project por primera vez, no sabía si "Import items from repository" iba a
+  funcionar de verdad hasta ver la épica aparecer sola en el tablero apenas la creé — lo confirmé
+  viendo la entrada de `github-project-automation` en el historial del issue.
+- Al armar el campo Iteration, no fue obvio de entrada que hubiera que crearlo manualmente (no
+  viene por defecto en un Project nuevo) — lo resolví con "+ New field" → tipo Iteration.
+- El mayor problema fue de infraestructura, no de Git en sí: al cambiar de rama con `git switch`
+  o `git checkout`, la terminal se colgaba preguntando repetidamente si reintentar borrar
+  carpetas de `tp2-invento` ("Deletion of directory ... failed"), sin poder escribir nada más.
+  Probé pausar OneDrive (mi carpeta de trabajo está dentro de Documentos, sincronizada) sin
+  éxito. Lo resolví borrando la carpeta conflictiva a mano con
+  `Remove-Item -Recurse -Force` antes del cambio de rama, dejando que Git la reconstruyera
+  entera desde el remoto con `git pull` una vez posicionado en la rama correcta — sin perder
+  nada, porque el contenido ya estaba respaldado en GitHub desde el merge del TP2.
+- Al revisar la guía con más cuidado noté que mis dos tareas de la historia no coincidían
+  exactamente con las que pide reproducir ("escribir el workflow" y "publicar el reporte de
+  tests como artefacto"): había creado una segunda tarea distinta (agregar badge al README).
+  La renombré para alinearla con la guía en vez de dejar una tarea propia.
+
+### 5. Declaración de uso de IA
+
+Usé Claude como guía paso a paso durante todo el TP: para interpretar qué pedía cada sección de
+la guía, decidir el orden de los pasos, y redactar los comandos de `gh` y el contenido de los
+issues a partir de lo que la guía especificaba textualmente. También me ayudó a diagnosticar el
+problema de bloqueo de archivos al cambiar de rama, proponiendo alternativas hasta encontrar una
+que funcionara. No tomó decisiones de fondo por mí: la duración del sprint, el límite de trabajo
+en progreso, y el diagnóstico de la historia mal escrita los pensé y escribí yo, verificando cada
+paso contra la salida real de mi terminal y de GitHub antes de seguir.
