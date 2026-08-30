@@ -163,12 +163,9 @@ pasa a ser una tarea técnica dentro de esa historia, no la historia en sí.
   viene por defecto en un Project nuevo) — lo resolví con "+ New field" → tipo Iteration.
 - El mayor problema fue de infraestructura, no de Git en sí: al cambiar de rama con `git switch`
   o `git checkout`, la terminal se colgaba preguntando repetidamente si reintentar borrar
-  carpetas de `tp2-invento` ("Deletion of directory ... failed"), sin poder escribir nada más.
+  carpetas de `tp2-invento`, sin poder escribir nada más.
   Probé pausar OneDrive (mi carpeta de trabajo está dentro de Documentos, sincronizada) sin
   éxito. Lo resolví borrando la carpeta conflictiva a mano con
-  `Remove-Item -Recurse -Force` antes del cambio de rama, dejando que Git la reconstruyera
-  entera desde el remoto con `git pull` una vez posicionado en la rama correcta — sin perder
-  nada, porque el contenido ya estaba respaldado en GitHub desde el merge del TP2.
 - Al revisar la guía con más cuidado noté que mis dos tareas de la historia no coincidían
   exactamente con las que pide reproducir ("escribir el workflow" y "publicar el reporte de
   tests como artefacto"): había creado una segunda tarea distinta (agregar badge al README).
@@ -183,3 +180,57 @@ problema de bloqueo de archivos al cambiar de rama, proponiendo alternativas has
 que funcionara. No tomó decisiones de fondo por mí: la duración del sprint, el límite de trabajo
 en progreso, y el diagnóstico de la historia mal escrita los pensé y escribí yo, verificando cada
 paso contra la salida real de mi terminal y de GitHub antes de seguir.
+
+
+******************************************************************************************************************************************************************
+
+## TP4 — CI: Pipelines as Code
+
+### 1. Estructura del pipeline
+
+Tengo dos jobs en paralelo, build-backend y build-frontend, uno por cada Dockerfile del TP2.
+Los separé porque son cosas independientes: si se rompe el frontend no tiene sentido esperar
+a que termine el backend para enterarme. Al no tener un needs entre ellos, corren en paralelo
+solos y cada uno en su propio runner, así que llega más rápido el aviso si algo falla.
+
+### 2. Qué cachea y qué pasa si desaparece
+
+Cachea las capas de Docker de cada imagen con cache-from/cache-to type=gha, mode=max. Cada
+job tiene su propio scope (backend y frontend) porque si no lo pongo, los dos jobs comparten
+el mismo cache por default y se pisan entre sí — vi eso mencionado en la guía y por suerte lo
+configuré bien desde el principio. En mi caso se reutilizan las capas de instalar dependencias
+(package.json, npm ci) cuando no cambié nada ahí. Si el cache desaparece, el pipeline anda
+igual, solo que más lento porque arranca de cero.
+
+### 3. Por qué usa mi Dockerfile y no compila por su cuenta
+
+Porque el Dockerfile ya es como se construye mi app de verdad, es lo mismo que después se
+despliega. Si el pipeline compilara por su lado con comandos sueltos, tendría dos formas
+distintas de construir que en algún momento van a decir cosas distintas: el pipeline puede
+decir que todo anda bien y la imagen real fallar igual. Usando el mismo Dockerfile me aseguro
+de que se prueba exactamente lo que se usa después.
+
+### 4. Problemas que tuve y cómo los resolví
+
+- De nuevo se me trabó la terminal al cambiar de rama por lo de OneDrive (mismo problema que
+  en el TP3). Lo resolví igual: borré la carpeta a mano con Remove-Item -Recurse -Force y
+  dejé que git la reconstruyera con pull.
+- Cuando fui a configurar el gate, no me aparecían build-backend ni build-frontend en el
+  buscador de checks. Era porque GitHub solo muestra los que corrieron en la última semana:
+  primero tenía que correr el pipeline una vez, y recién ahí configurar el gate.
+- Para romper el build a propósito tuve que pensar bien qué romper, porque mi app es
+  JavaScript puro sin compilación: escribir código roto no iba a hacer fallar el docker
+  build. Rompí una dependencia en cambio, agregando un paquete que no existe al package.json
+  del backend, y ahí sí falló el npm ci.
+- Para ver el "Update branch" en acción tuve que tener dos PRs abiertos a la vez: mergeé
+  el que arreglaba el build, y el otro pasó solo a decir que estaba desactualizado, con los
+  checks en verde pero el merge igual bloqueado hasta actualizarlo.
+
+### 5. Uso de IA
+
+Usé Claude para ir entendiendo la guía paso a paso, decidir el orden correcto (por ejemplo
+mergear el workflow real antes de intentar romper el build, para no probar contra el
+placeholder del TP3), y para pensar juntos por qué mi stack necesitaba romper una dependencia
+y no el código. También me ayudó a resolver de nuevo el problema de la terminal trabada. Las
+decisiones de fondo (por qué esos jobs, qué cachea, por qué el Dockerfile) las pensé y escribí
+yo, comprobando cada paso contra lo que realmente pasaba en mi terminal y en GitHub.
