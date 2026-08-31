@@ -115,7 +115,9 @@ estructura real de mi proyecto, y sobre todo para diagnosticar los tres problema
 BACKEND_URL por su cuenta: lo detectamos juntos comparando el comportamiento esperado contra lo
 que realmente mostraba el dashboard, y confirmé la causa yo mismo revisando el código fuente
 (pages/_app.tsx) y el Network tab del navegador antes de aplicar el fix. Cada comando lo ejecuté
-yo en mi propia terminal, verificando la salida real contra lo que se esperaba antes de seguir.
+yo en mi propia terminal, verificando la salida real contra lo que se esperaba antes de seguir.Y como en todos los Tps 
+la use para desarrollar de manera mas técnica la parte de decisiones
+
 
 
 ****************************************************************************************************************************************************
@@ -179,7 +181,9 @@ issues a partir de lo que la guía especificaba textualmente. También me ayudó
 problema de bloqueo de archivos al cambiar de rama, proponiendo alternativas hasta encontrar una
 que funcionara. No tomó decisiones de fondo por mí: la duración del sprint, el límite de trabajo
 en progreso, y el diagnóstico de la historia mal escrita los pensé y escribí yo, verificando cada
-paso contra la salida real de mi terminal y de GitHub antes de seguir.
+paso contra la salida real de mi terminal y de GitHub antes de seguir.Y como en todos los Tps 
+la use para desarrollar de manera mas técnica la parte de decisiones
+
 
 
 ******************************************************************************************************************************************************************
@@ -220,6 +224,7 @@ de que se prueba exactamente lo que se usa después.
   primero tenía que correr el pipeline una vez, y recién ahí configurar el gate.
 - Para romper el build a propósito tuve que pensar bien qué romper, porque mi app es
   JavaScript puro sin compilación: escribir código roto no iba a hacer fallar el docker
+
   build. Rompí una dependencia en cambio, agregando un paquete que no existe al package.json
   del backend, y ahí sí falló el npm ci.
 - Para ver el "Update branch" en acción tuve que tener dos PRs abiertos a la vez: mergeé
@@ -233,4 +238,5 @@ mergear el workflow real antes de intentar romper el build, para no probar contr
 placeholder del TP3), y para pensar juntos por qué mi stack necesitaba romper una dependencia
 y no el código. También me ayudó a resolver de nuevo el problema de la terminal trabada. Las
 decisiones de fondo (por qué esos jobs, qué cachea, por qué el Dockerfile) las pensé y escribí
-yo, comprobando cada paso contra lo que realmente pasaba en mi terminal y en GitHub.
+yo, comprobando cada paso contra lo que realmente pasaba en mi terminal y en GitHub.Y como en todos los Tps 
+la use para desarrollar de manera mas técnica la parte de decisiones
