@@ -156,16 +156,13 @@ pasa a ser una tarea técnica dentro de esa historia, no la historia en sí.
 
 ### 4. Problemas encontrados y cómo los resolví
 
-- Al crear el Project por primera vez, no sabía si "Import items from repository" iba a
-  funcionar de verdad hasta ver la épica aparecer sola en el tablero apenas la creé — lo confirmé
-  viendo la entrada de `github-project-automation` en el historial del issue.
-- Al armar el campo Iteration, no fue obvio de entrada que hubiera que crearlo manualmente (no
-  viene por defecto en un Project nuevo) — lo resolví con "+ New field" → tipo Iteration.
 - El mayor problema fue de infraestructura, no de Git en sí: al cambiar de rama con `git switch`
   o `git checkout`, la terminal se colgaba preguntando repetidamente si reintentar borrar
-  carpetas de `tp2-invento`, sin poder escribir nada más.
-  Probé pausar OneDrive (mi carpeta de trabajo está dentro de Documentos, sincronizada) sin
-  éxito. Lo resolví borrando la carpeta conflictiva a mano con
+  carpetas de `tp2-invento`, sin poder escribir nada más. Probé pausar OneDrive (mi carpeta de
+  trabajo está dentro de Documentos, sincronizada) sin éxito. Lo resolví borrando la carpeta
+  conflictiva a mano con `Remove-Item -Recurse -Force` antes del cambio de rama, dejando que Git
+  la reconstruyera entera desde el remoto con `git pull` una vez posicionado en la rama correcta
+  — sin perder nada, porque el contenido ya estaba respaldado en GitHub desde el merge del TP2.
 - Al revisar la guía con más cuidado noté que mis dos tareas de la historia no coincidían
   exactamente con las que pide reproducir ("escribir el workflow" y "publicar el reporte de
   tests como artefacto"): había creado una segunda tarea distinta (agregar badge al README).
