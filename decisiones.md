@@ -101,10 +101,7 @@ Contra los criterios de la guía:
   ENV NEXT_PUBLIC_BACKEND_URL=http://localhost:3001 en el Dockerfile antes del RUN npm run
   build, ya que en Next.js las variables NEXT_PUBLIC_* quedan horneadas en el bundle del
   navegador en tiempo de build y no se pueden inyectar después en runtime.
-- Volumen no visible en el explorador de Windows: al principio esperaba encontrar los datos de
-  Mongo en alguna carpeta de mi disco. No aparece porque Docker Desktop en Windows corre los
-  contenedores dentro de una VM Linux; el volumen vive en el filesystem de esa VM, no en mi disco de
-  Windows directamente.
+
 
 ### 4. Uso de IA
 
