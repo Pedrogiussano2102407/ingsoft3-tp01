@@ -178,7 +178,7 @@ exports.item_delete_post = asyncHandler(async (req, res, next) => {
     return res.send();
   }
 
-  const item = Item.findById(req.params.id).exec();
+  const item = await Item.findById(req.params.id).exec();
 
   // check if item exists
   if (!item) {
