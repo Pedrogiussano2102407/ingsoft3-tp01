@@ -2,11 +2,12 @@
   "name": "server",
   "version": "0.0.0",
   "private": true,
-  "scripts": {
-    "start": "node ./bin/www",
-    "dev": "nodemon ./bin/www",
-    "test": "jest"
-  },
+ "scripts": {
+  "start": "node ./bin/www",
+  "dev": "nodemon ./bin/www",
+  "test": "jest",
+  "test:ci": "jest --coverage --coverageDirectory=${COVERAGE_DIR:-coverage}"
+},
   "dependencies": {
     "cookie-parser": "~1.4.4",
     "cors": "^2.8.5",
