@@ -24,7 +24,7 @@ exports.category_detail = asyncHandler(async (req, res, next) => {
 
   if (category === null) {
     // No results.
-    res.redirect("/categories");
+    return res.redirect("/categories");
   }
 
   res.json(category);
