@@ -4,6 +4,7 @@ import CategoryTableSort from "../components/TableSort";
 import { Category } from "../common/types";
 import { appProps } from "../common/types";
 import { ERROR } from "../common/utils";
+import { deleteCategoryRequest } from "../common/categoryApi";
 
 export default function Categories({
   backendURL,
@@ -29,35 +30,20 @@ export default function Categories({
     }
   }
 
-  async function deleteCategory(category: Category) {
+    async function deleteCategory(category: Category) {
     // ask for admin password
     const password = prompt("Enter admin password");
-    if (!password || password.length < 3) {
-      displayError("Invalid admin password");
-      return;
-    }
+    const result = await deleteCategoryRequest(
+      backendURL,
+      category._id,
+      password
+    );
 
-    try {
-      const response = await fetch(
-        `${backendURL}/category/${category._id}/delete`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ password }),
-        }
-      );
-      console.log(response);
-
-      if (response.ok) {
-        // if request succeeded, fetch new list of categories
-        fetchCategories();
-      } else {
-        displayError(response.statusText);
-      }
-    } catch (error) {
-      displayError(ERROR.SERVER_CONNECTION);
+    if (result.ok) {
+      // if request succeeded, fetch new list of categories
+      fetchCategories();
+    } else {
+      displayError(result.message);
     }
   }
 
