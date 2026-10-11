@@ -123,7 +123,7 @@ exports.item_create_post = [
     const errors = validationResult(req);
 
     // Check if category is valid
-    const category = Category.findById(req.body.category).exec();
+    const category = await Category.findById(req.body.category).exec();
 
     if (!category) {
       res.writeHead(400, `Invalid category`);
