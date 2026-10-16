@@ -123,7 +123,7 @@ exports.item_create_post = [
     const errors = validationResult(req);
 
     // Check if category is valid
-    const category = Category.findById(req.body.category).exec();
+    const category = await Category.findById(req.body.category).exec();
 
     if (!category) {
       res.writeHead(400, `Invalid category`);
@@ -178,7 +178,7 @@ exports.item_delete_post = asyncHandler(async (req, res, next) => {
     return res.send();
   }
 
-  const item = Item.findById(req.params.id).exec();
+  const item = await Item.findById(req.params.id).exec();
 
   // check if item exists
   if (!item) {
