@@ -228,3 +228,152 @@ placeholder del TP3), y para pensar juntos por qué mi stack necesitaba romper u
 y no el código. También me ayudó a resolver de nuevo el problema de la terminal trabada. Las
 decisiones de fondo (por qué esos jobs, qué cachea, por qué el Dockerfile) las pensé y escribí
 yo, comprobando cada paso contra lo que realmente pasaba en mi terminal y en GitHub.
+
+
+
+----------------------------------------------------------------------------------------------------------------------------------
+
+
+
+****************************************************************************************************************************************************
+
+
+## TP5 — Testing y calidad
+
+### 1. Qué lógica elegí testear y por qué esa
+
+En el backend testeé los controladores de items y categorías, porque ahí están las reglas que más
+duelen si fallan: la clave de admin para borrar, no borrar una categoría que tiene items, qué pasa
+si el recurso no existe y que no se cree nada con datos inválidos. En el frontend testeé la lógica
+pura de `client/common`: `categoryApi.ts` (cómo se llama a la API y cómo reacciona ante errores),
+`stock.ts` (`stockLevel`, que decide el aviso de stock) y `utils.tsx`. Elegí cosas sin DOM ni red
+porque se testean rápido y, si algo falla, se sabe enseguida dónde está el problema.
+
+### 2. Umbral de cobertura y por qué ese número
+
+- **Backend (jest): 65 % de líneas.** Antes de agregar el último test medía 70,54 % de líneas,
+  90,9 % de ramas y 45 % de funciones. Puse 65 porque queda por debajo de lo que mido: si la
+  cobertura baja me frena, pero no es un número inalcanzable. Después del test de `category_detail`
+  (ver el punto 6) mido 71,31 % de líneas, 95,45 % de ramas y 45 % de funciones, o sea que el umbral
+  queda 6,3 puntos abajo. El umbral es solo de líneas, pero la rama la reporto igual. Para subirlo
+  tendría que testear lo que falta de `itemController.js` (63,93 % de líneas y 30 % de funciones).
+- **Frontend (vitest 2.1.9): 90 % de líneas y 90 % de ramas.** Lo había puesto en 80 %, pero con ese
+  número una función nueva sin tests no frenaba el build, así que lo subí a 90 %. Hoy mide 100 % en
+  todo `common`.
+- Cobertura publicada y reporte descargable (backend y frontend): https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/38962997202
+
+### 3. Qué dejé afuera de la cuenta y por qué
+
+- **Backend** (`jest.config.js`): saco con exclusiones, no con una lista de lo que entra, así un
+  archivo nuevo entra solo en la cuenta. Excluí `bin/` (arranque del servidor), `app.js` (arranque
+  y cableado de Express), `routes/` (solo une una URL con un controlador), `populatedb.js` (script
+  para cargar datos de prueba, no es parte de la app) y los propios tests. Lo excluí después de
+  comprobar que ahí no queda lógica de negocio: las reglas viven en los controladores, que sí se miden.
+- Los modelos **no** los excluí: `models/category.js` mide 100 % y `models/item.js` tiene 0 % de
+  funciones porque nadie llama al virtual `url` (línea 30). Prefiero dejar ese hueco a la vista.
+- **Frontend** (`vitest.config.mts`): entra `common/**/*.{ts,tsx}`; salen los tests y `common/types.ts`,
+  que solo tiene tipos y no genera código ejecutable.
+
+### 4. Por qué un coverage alto no garantiza calidad
+
+Con mi propio código: un test que llame a `category_detail` con una categoría que existe y no tenga
+ningún `expect` ejecutaría la línea del `res.json(...)` y la cobertura subiría, pero no comprobaría
+que se responde con la categoría correcta. La cobertura mide qué líneas se ejecutaron, no si alguien
+verificó el resultado. Por eso mis tests miran valores y llamadas concretas (`toHaveBeenCalledWith`)
+y no solo que el código corra. Además mi umbral del backend es solo de líneas, que es la métrica más
+fácil de cumplir: una línea puede correr por un solo camino y contar como cubierta.
+
+### 5. Tests con mock
+
+- **Backend:** en `categoryController.test.js` reemplazo los modelos de Mongoose con `jest.mock`, así
+  ningún test toca la base. El test de borrado exitoso verifica la interacción: `findByIdAndRemove` se
+  llama una sola vez y con `"cat1"`. Un stub solo devolvería datos; acá el assert mira cómo se usó la
+  dependencia, por eso es un mock.
+- **Frontend:** en `categoryApi.test.ts` el `fetch` entra por parámetro como `fetchFalso` (`vi.fn()`).
+  Los tests verifican que se llamó una vez y con qué argumentos, y que ante una entrada inválida no
+  se sale a la red.
+- **Refactor para poder mockear:** en el backend no hizo falta cambiar el código de producción, porque
+  `jest.mock` reemplaza el módulo del modelo completo. En el frontend la función que llama a la API
+  recibe `fetch` como parámetro en vez de usarlo directo, y eso permite pasarle un doble desde el test
+  sin levantar ningún servidor.
+
+### 6. El ejercicio de la rama sin cubrir
+
+1. **Qué línea es:** `tp2-invento/server/controllers/categoryController.js`, línea 25,
+   `if (category === null)`. El reporte marcaba sin recorrer el camino falso: que la categoría exista
+   y se responda con `res.json(category)`.
+2. **Qué entrada la recorrería:** que `Category.findById(...).exec()` devuelva un objeto, por ejemplo
+   `{ _id: "cat1", name: "Herramientas" }`.
+3. **Qué decidí:** agregué el test `categoria existente: responde con el json y no redirige`. Es la
+   respuesta normal de la función y ningún test la verificaba: lo único que cubría era el redirect
+   cuando la categoría no existe. Son pocas líneas y verifica la interacción (`res.json` con esa
+   categoría y `res.redirect` sin llamar). Con ese test, `categoryController.js` pasó de 73,21 % a
+   75 % de líneas y de 91,66 % a 100 % de ramas, y la rama de la línea 25 dejó de figurar sin
+   recorrer. Dejé a propósito sin cubrir la otra que encontré (`itemController.js`, línea 144,
+   `if (req.body.image)`): es un campo opcional y su camino verdadero solo asigna un valor. Es la
+   única rama que queda sin recorrer en el backend.
+
+### 7. Mi Pull Request bloqueado
+
+- **Secuencia completa (PR #22):** agregué `client/common/stock.ts` (`stockLevel`) sin tests y el job
+  `build-frontend` se puso en rojo en el paso «Correr los tests del frontend con coverage». El código
+  compilaba y los 11 tests pasaban: frenó la cobertura.
+  - Corrida roja: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/38441500878
+  - En el log: `ERROR: Coverage for lines (79.45%) does not meet global threshold (90%)`.
+  - Frenó por **líneas**, con vitest 2.1.9: `stock.ts` tenía 0 % de líneas y, como se ve en el log,
+    sus ramas figuraban en 100 %, porque esa versión no cuenta como ramas sin cubrir las de una
+    función que ningún test ejecuta. Por eso el umbral de líneas es el que corta.
+  - Lo arreglé con `common/stock.test.ts`: un `it.each` con un caso por camino y por borde (0, 1, 4,
+    5, 19, 20 y los estados `Loaned`/`Reserved`). Pasé a 22 tests y 100 % en todo.
+  - PR mergeado con squash: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/pull/22
+- **Freno vigente:** https://github.com/Pedrogiussano2102407/ingsoft3-tp01/pull/23 queda abierto y en
+  rojo hasta la defensa. Agrega `common/descuento.ts` sin tests: `build-frontend` falla por líneas
+  (80,21 % contra 90 %; las ramas quedan en 95,23 %, todavía arriba del umbral) y `build-backend`
+  pasa. Con el check requerido en rojo, el merge está bloqueado.
+
+### 8. Mi stack: qué usé para cada cosa
+
+Mi app no es la de la cátedra (.NET): es Node/Express con jest en el backend y Next.js con
+TypeScript y vitest en el frontend. Lo que usé en cada punto de la tabla de la guía:
+
+- **Dónde viven los tests:** al lado del código (`*.test.js` en el backend, `*.test.ts` en el frontend).
+- **Parametrizado:** `it.each` de vitest en el frontend (`stock.test.ts`).
+- **Doble (mock):** `jest.fn()` y `jest.mock` en el backend (reemplazo los modelos de Mongoose) y
+  `vi.fn()` en el frontend (`fetchFalso`).
+- **Medir la cobertura:** `jest --coverage` en el backend y `vitest run --coverage` (proveedor v8) en
+  el frontend.
+- **Umbral que rompe el build:** `coverageThreshold` de jest (`global: { lines: 65 }`) y
+  `coverage.thresholds` de vitest (líneas 90 y ramas 90). Si no se cumple, el comando termina con
+  código de error y el job se pone en rojo.
+- **Qué entra en la cuenta:** `collectCoverageFrom` con exclusiones en jest y `include`/`exclude` de
+  `coverage` en vitest (detalle en el punto 3).
+- **Reporte legible:** reporters `lcov` y `json-summary` en jest, y `text`, `html`, `lcov` y
+  `json-summary` en vitest. El pipeline publica el resumen en el run y sube los reportes como
+  artefactos descargables, de los dos lados.
+- **Herramientas de test en el Dockerfile:** agregué una etapa `test` en cada Dockerfile que instala
+  también las dependencias de desarrollo (jest y vitest); la etapa final de producción sigue sin
+  ellas.
+
+### 9. Problemas que tuve y cómo los resolví
+
+- Al escribir los tests encontré bugs reales de `await`/`return` en `category_detail`,
+  `item_delete_post`, `category_create_post` e `item_create_post` y los corregí.
+- Con el umbral del frontend en 80 %, una función sin tests no frenaba el build; lo subí a 90 %.
+- La tabla de cobertura de jest se me copiaba sin los nombres de archivo, así que saqué los números
+  por archivo y las ramas sin recorrer directo del JSON de cobertura (`coverage-summary.json` y
+  `coverage-final.json`).
+- Pegando comandos en la terminal se me coló un `>` del prompt y PowerShell creó un archivo suelto
+  (`erver`) con la salida de un comando. Lo borré antes de commitear para que no se colara en un PR.
+- Al correr `git grep` la terminal quedó trabada en el paginador de Git; salí con `q` y después usé
+  `--no-pager`.
+
+### 10. Uso de IA
+
+Usé Claude como guía paso a paso: para interpretar la guía, ordenar los pasos (rojo, tests, verde,
+merge, y recién después el PR que queda abierto), armar el test de `stockLevel` y el de
+`category_detail`, y leer los reportes de cobertura. También me ayudó a redactar el borrador de esta
+sección, que después revisé y ajusté. Cada comando lo corrí yo en mi terminal y verifiqué la salida
+real (la suite local, los reportes de cobertura y las corridas en Actions) antes de seguir. Puedo
+explicar qué verifica cada assert. Lo que NO está cubierto: el camino verdadero de
+`if (req.body.image)` en `itemController.js`, el virtual `url` de `models/item.js` y los tramos sin
+tests de `itemController.js`; por eso el backend queda cerca del 71 % de líneas y no más arriba.
