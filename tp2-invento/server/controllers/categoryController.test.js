@@ -79,4 +79,16 @@ describe("category_detail", () => {
     expect(res.redirect).toHaveBeenCalledWith("/categories");
     expect(res.json).not.toHaveBeenCalled();
   });
+
+  it("categoria existente: responde con el json y no redirige", async () => {
+    const categoria = { _id: "cat1", name: "Herramientas" };
+    Category.findById.mockReturnValue(query(categoria));
+    const res = { redirect: jest.fn(), json: jest.fn() };
+
+    await category_detail({ params: { id: "cat1" } }, res, jest.fn());
+
+    expect(Category.findById).toHaveBeenCalledWith("cat1");
+    expect(res.json).toHaveBeenCalledWith(categoria);
+    expect(res.redirect).not.toHaveBeenCalled();
+  });
 });
