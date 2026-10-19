@@ -15,7 +15,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { useState } from "react";
 
 export default function App({ Component, pageProps }: any) {
-  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+  const BACKEND_URL = "/api";
   const [modalOpened, modalHandler] = useDisclosure(false);
   const [modalText, setModalText] = useState("hello");
   const [loading, loadingHandler] = useDisclosure(false);
