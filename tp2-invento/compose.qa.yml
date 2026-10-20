@@ -1,0 +1,44 @@
+name: qa
+
+services:
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_data_qa:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/pedrogiussano2102407/ingsoft3-tp01-backend:sha-${IMAGE_TAG:?falta IMAGE_TAG}
+    environment:
+      MONGO_STRING: mongodb://mongo:27017/invento_qa
+      ADMIN_KEY: ${ADMIN_KEY:?falta ADMIN_KEY}
+    ports:
+      - "3001:3001"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001/categories"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/pedrogiussano2102407/ingsoft3-tp01-frontend:sha-${IMAGE_TAG:?falta IMAGE_TAG}
+    environment:
+      BACKEND_URL: http://backend:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mongo_data_qa:
