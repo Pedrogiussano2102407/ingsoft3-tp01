@@ -5,6 +5,8 @@ on:
     branches: [main]
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
 
 jobs:
   build-backend:
@@ -185,4 +187,42 @@ jobs:
           }
           Write-Host "QA no respondio a tiempo"
           docker compose -f tp2-invento/compose.qa.yml ps
+          exit 1
+
+  deploy-prod:
+    needs: deploy-qa
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+    environment: production
+    env:
+      IMAGE_TAG: ${{ github.sha }}
+      ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
+    steps:
+      - name: Bajar el codigo al runner
+        uses: actions/checkout@v6
+
+      - name: Desplegar PROD con la imagen verificada
+        shell: powershell
+        run: |
+          docker compose -f tp2-invento/compose.prod.yml pull
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          docker compose -f tp2-invento/compose.prod.yml up -d
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Smoke test de PROD (con reintentos)
+        shell: powershell
+        run: |
+          for ($i = 1; $i -le 30; $i++) {
+            try {
+              $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 10 http://localhost:3010/api/categories
+              if ($r.StatusCode -eq 200) {
+                Write-Host "PROD respondio en el intento ${i}"
+                exit 0
+              }
+            } catch { }
+            Write-Host "intento ${i}: PROD todavia no responde"
+            Start-Sleep -Seconds 5
+          }
+          Write-Host "PROD no respondio a tiempo"
+          docker compose -f tp2-invento/compose.prod.yml ps
           exit 1
