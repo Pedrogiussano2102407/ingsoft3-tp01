@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-ENV NEXT_PUBLIC_BACKEND_URL=http://localhost:3001
+
 RUN npm run build
 
 # ---- Etapa 2: tests (parte del build: ya tiene Node y las dependencias de desarrollo) ----
@@ -15,6 +15,7 @@ ENTRYPOINT ["npm", "run", "test:ci"]
 FROM node:20-alpine AS final
 WORKDIR /app
 ENV NODE_ENV=production
+ENV BACKEND_URL=http://backend:3001
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
