@@ -1,3 +1,28 @@
+## Enlaces de este TP (TP6)
+
+**Paquetes públicos** (se bajan con `docker pull` sin credenciales, etiquetados con el commit de un merge):
+- ghcr.io/pedrogiussano2102407/ingsoft3-tp01-backend:sha-bf6d855b6598fdab0e33bebcddf04d9dd83933bb
+- ghcr.io/pedrogiussano2102407/ingsoft3-tp01-frontend:sha-bf6d855b6598fdab0e33bebcddf04d9dd83933bb
+
+**Cadena de la Tarea 1:**
+- Job del PR, con «Entrar al registry» salteado: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39135109921/job/117697930522
+- Pasos de la corrida de `main`, con «Construir y publicar» último: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39135450273/job/117698928173
+
+**Entornos** (corren en mi máquina, vivos hasta la defensa):
+- QA: http://localhost:3000 (API: http://localhost:3001)
+- PROD: http://localhost:3010 (API: http://localhost:3011)
+
+**Corridas:**
+- Deploy automático a QA: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39712913360/job/119608563642
+- Rechazo con motivo (intento 1): https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39773269184/attempts/1
+- Aprobación y deploy a PROD, commit A (intento 2): https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39773269184/attempts/2
+- Deploy del commit B a PROD (PR #31): https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39891229230
+- Rollback de B a A (intento 3): https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39773269184/attempts/3
+
+**Commits:** A = `d0a9fa8c410edb1f3ff7a5215847a88bb24e2c50` (el que está en PROD y al que apunta el tag) · B = `e6740828917b5563a88586570aea0b13b96ea470`
+
+**Release:** https://github.com/Pedrogiussano2102407/ingsoft3-tp01/releases/tag/v6.0.0
+
 # Decisiones — TP1
 
 ## 1. Por qué Git no pudo resolver el conflicto solo
