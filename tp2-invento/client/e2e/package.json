@@ -1,0 +1,12 @@
+{
+  "name": "e2e-invento",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:integracion": "playwright test api.spec.js",
+    "test:e2e": "playwright test ui.spec.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
+  }
+}
