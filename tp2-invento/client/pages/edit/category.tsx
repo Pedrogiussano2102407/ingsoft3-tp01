@@ -88,7 +88,7 @@ export default function CategoryForm({ backendURL, displayError }: props) {
             {...form.getInputProps("description")}
           />
           <Group justify="flex-end" mt="md">
-            <Button type="submit">Submit</Button>
+            <Button type="submit">Enviar</Button>
           </Group>
         </Stack>
       </form>
