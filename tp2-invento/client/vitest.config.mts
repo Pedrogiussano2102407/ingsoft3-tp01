@@ -1,7 +1,9 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig, configDefaults } from "vitest/config";
 
 export default defineConfig({
   test: {
+    // e2e/ tiene pruebas de Playwright: Vitest no debe levantarlas (las corre su propio job)
+    exclude: [...configDefaults.exclude, "e2e/**"],
     coverage: {
       provider: "v8",
       // json-summary es el archivo que el pipeline lee para armar el resumen

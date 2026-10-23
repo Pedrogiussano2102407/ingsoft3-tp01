@@ -190,8 +190,84 @@ jobs:
           docker compose -f tp2-invento/compose.qa.yml ps
           exit 1
 
-  deploy-prod:
+  integracion:
     needs: deploy-qa
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+    environment: qa
+    env:
+      API_BASE_URL: http://localhost:3001
+      ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
+    defaults:
+      run:
+        working-directory: tp2-invento/client/e2e
+    steps:
+      - name: Bajar el codigo al runner
+        uses: actions/checkout@v6
+
+      - name: Instalar las pruebas
+        shell: powershell
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx playwright install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Pruebas de integracion contra la api de QA
+        shell: powershell
+        run: |
+          npx playwright test api.spec.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Subir el reporte de integracion
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-integracion
+          path: tp2-invento/client/e2e/playwright-report/
+          if-no-files-found: error
+          retention-days: 30
+
+  e2e:
+    needs: integracion
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+    environment: qa
+    env:
+      E2E_BASE_URL: http://localhost:3000
+      API_BASE_URL: http://localhost:3001
+      ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
+    defaults:
+      run:
+        working-directory: tp2-invento/client/e2e
+    steps:
+      - name: Bajar el codigo al runner
+        uses: actions/checkout@v6
+
+      - name: Instalar las pruebas
+        shell: powershell
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx playwright install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Pruebas e2e con navegador contra QA
+        shell: powershell
+        run: |
+          npx playwright test ui.spec.js
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Subir el reporte e2e
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-e2e
+          path: tp2-invento/client/e2e/playwright-report/
+          if-no-files-found: error
+          retention-days: 30
+  deploy-prod:
+    needs: e2e
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: self-hosted
     environment: production
