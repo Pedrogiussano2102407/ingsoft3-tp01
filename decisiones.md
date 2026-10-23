@@ -402,3 +402,32 @@ real (la suite local, los reportes de cobertura y las corridas en Actions) antes
 explicar qué verifica cada assert. Lo que NO está cubierto: el camino verdadero de
 `if (req.body.image)` en `itemController.js`, el virtual `url` de `models/item.js` y los tramos sin
 tests de `itemController.js`; por eso el backend queda cerca del 71 % de líneas y no más arriba.
+
+## TP6 — Entrega continua
+
+### 1. Por qué se publica solo con verde
+Hay tres eslabones encadenados. Nada entra a `main` sin los checks en verde (branch protection), solo `main` publica imágenes, y publicar es el último paso del job que testea. Así, una imagen en el registry significa «esto pasó la verificación». Si se publicara igual, el registry dejaría de significar eso y podría tener imágenes que nunca se probaron. Lo que la cadena no garantiza: un `docker push` hecho a mano entra igual, y un digest en lugar de un tag sería una referencia más fuerte.
+
+### 2. Continuous Delivery vs Continuous Deployment
+Implementé **Delivery**: QA se despliega solo tras el merge y PROD necesita una aprobación humana. Para llegar a Deployment me faltaría confianza automática: más tests, observabilidad y rollback automático.
+
+### 3. El diseño de la cadena
+`deploy-qa` usa `needs` para esperar a los dos builds y `if` para correr solo en un push a `main`. `deploy-prod` depende de `deploy-qa` y corre en el environment `production`, que exige aprobación. `ADMIN_KEY` vive en el environment de cada entorno con valores distintos, y el de PROD solo lo ve un job que ya pasó la aprobación. El deploy usa `github.sha`, o sea el commit verificado y no la punta de la rama. Lo comprobé con el rollback: re-ejecuté el deploy de la corrida de A mientras `main` ya estaba en B, y PROD volvió a las imágenes `sha-d0a9fa8`. El workflow no tiene un bloque `concurrency`, así que nada ordena dos corridas seguidas: cada una despliega su propio commit.
+
+### 4. Qué miro antes de aprobar
+Antes de aprobar el paso a PROD reviso tres cosas: que el smoke de QA pasó y que la corrida es de este commit (la etiqueta `sha-…` de las imágenes de QA coincide), que en QA puedo crear una categoría y borrarla con la `ADMIN_KEY` de QA, y que los checks del PR eran verdes y el cambio es el que quería promover. Lo que el aprobador no puede ver: errores que solo aparecen con carga o con datos reales, y cómo se comporta la versión nueva con usuarios. Para decidir mejor me faltaría observabilidad (métricas y logs) en vez de depender de una prueba manual.
+
+### 5. La letra chica de mi «free tier»
+No uso Render ni una base en la nube: el entorno corre en mi máquina con un runner propio y un `docker compose` por entorno. El costo real es que el runner y Docker Desktop tienen que estar encendidos; si no, los deploys quedan en espera. Tampoco hay una URL pública: QA y PROD son `localhost` y se navegan en vivo desde mi máquina. Un runner propio en un repo público es un riesgo, porque un PR ajeno podría ejecutar código en mi equipo. Por eso el runner no corre como servicio ni como administrador, y está activada la aprobación para colaboradores externos.
+
+### 6. Qué garantía gano frente a Render
+Render reconstruiría la imagen desde el repo, y esa imagen podría no ser la que pasó el CI. Mis `compose` bajan la **imagen ya verificada**, por su etiqueta de commit, así que QA y PROD corren exactamente lo que probó el pipeline.
+
+### 7. Qué prueba el smoke test y qué no
+Prueba que un pedido atraviesa front, proxy, backend y Mongo y que responde `200`. Reintenta porque el arranque de los contenedores no es instantáneo. No dice **qué versión** corre: eso se verifica en la etiqueta de la imagen con `docker ps`.
+
+### Qué quedó por variable y qué quedó dentro de la imagen
+La dirección del backend (`BACKEND_URL`) **no** está dentro de la imagen del front: se lee del entorno al arrancar, en la plantilla de nginx. Por eso la misma imagen sirve en QA y en PROD y cada una habla con su API. Por entorno también cambian los puertos, el nombre del proyecto de compose, la base de datos y la `ADMIN_KEY`. Dentro de la imagen queda el código y el build de cada servicio. Separar así la configuración del artefacto es lo que permite promover la misma imagen de un entorno a otro.
+
+### Entornos: el fallback local
+Elegí el plan local documentado: un runner propio en mi máquina y un `docker compose` por entorno, cada uno con su Mongo y su volumen (`invento_qa` e `invento_prod`). El deploy lo dispara el pipeline, no un `docker compose up` manual. Descarté Atlas y Render porque la base es un contenedor desde el TP2.
