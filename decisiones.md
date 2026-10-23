@@ -14,7 +14,7 @@
 
 **Corridas:**
 - Deploy automático a QA: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39712913360/job/119608563642
-- Rechazo con motivo (intento 1): https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39773269184/attempts/1
+- Rechazo con motivo escrito: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39891229230/attempts/2
 - Aprobación y deploy a PROD, commit A (intento 2): https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39773269184/attempts/2
 - Deploy del commit B a PROD (PR #31): https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39891229230
 - Rollback de B a A (intento 3): https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39773269184/attempts/3
@@ -256,7 +256,8 @@ yo, comprobando cada paso contra lo que realmente pasaba en mi terminal y en Git
 
 
 
-----------------------------------------------------------------------------------------------------------------------------------
+
+---
 
 
 
@@ -403,6 +404,9 @@ explicar qué verifica cada assert. Lo que NO está cubierto: el camino verdader
 `if (req.body.image)` en `itemController.js`, el virtual `url` de `models/item.js` y los tramos sin
 tests de `itemController.js`; por eso el backend queda cerca del 71 % de líneas y no más arriba.
 
+
+---
+
 ## TP6 — Entrega continua
 
 ### 1. Por qué se publica solo con verde
@@ -416,6 +420,8 @@ Implementé **Delivery**: QA se despliega solo tras el merge y PROD necesita una
 
 ### 4. Qué miro antes de aprobar
 Antes de aprobar el paso a PROD reviso tres cosas: que el smoke de QA pasó y que la corrida es de este commit (la etiqueta `sha-…` de las imágenes de QA coincide), que en QA puedo crear una categoría y borrarla con la `ADMIN_KEY` de QA, y que los checks del PR eran verdes y el cambio es el que quería promover. Lo que el aprobador no puede ver: errores que solo aparecen con carga o con datos reales, y cómo se comporta la versión nueva con usuarios. Para decidir mejor me faltaría observabilidad (métricas y logs) en vez de depender de una prueba manual.
+
+Rechacé una corrida de `deploy-prod` en el gate de `production` con este motivo: «Rechazado: el cambio de esta corrida es solo un comentario de prueba (e674082). No hay motivo para promoverlo, y PROD tiene que seguir en d0a9fa8, el commit de la release». Esa corrida quedó rechazada, no desplegó nada y PROD siguió en el commit A. El rechazo está en: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39891229230/attempts/2
 
 ### 5. La letra chica de mi «free tier»
 No uso Render ni una base en la nube: el entorno corre en mi máquina con un runner propio y un `docker compose` por entorno. El costo real es que el runner y Docker Desktop tienen que estar encendidos; si no, los deploys quedan en espera. Tampoco hay una URL pública: QA y PROD son `localhost` y se navegan en vivo desde mi máquina. Un runner propio en un repo público es un riesgo, porque un PR ajeno podría ejecutar código en mi equipo. Por eso el runner no corre como servicio ni como administrador, y está activada la aprobación para colaboradores externos.
@@ -431,3 +437,27 @@ La dirección del backend (`BACKEND_URL`) **no** está dentro de la imagen del f
 
 ### Entornos: el fallback local
 Elegí el plan local documentado: un runner propio en mi máquina y un `docker compose` por entorno, cada uno con su Mongo y su volumen (`invento_qa` e `invento_prod`). El deploy lo dispara el pipeline, no un `docker compose up` manual. Descarté Atlas y Render porque la base es un contenedor desde el TP2.
+
+### 8. Patrón de deployment para una producción real y plan de rollback
+**Patrón elegido: blue-green.** Mantendría dos entornos completos de producción (uno sirve el tráfico y el otro recibe la versión nueva) y cambiaría el tráfico de uno al otro una vez verificado. Lo elijo porque el rollback es instantáneo (se vuelve a apuntar al entorno anterior) y porque hoy mi `up -d` recrea los contenedores y produce un corte corto, que blue-green evita. Además ya tengo la mitad armada: QA y PROD son dos entornos completos que corren la misma imagen. El costo es mantener el doble de infraestructura mientras dura el cambio. No elijo canary porque necesita un balanceador que reparta un porcentaje del tráfico y métricas para decidir si la versión nueva funciona, y hoy no tengo ninguna de las dos. Lo que me falta para ejecutarlo: el balanceador que cambie el tráfico y observabilidad (métricas y logs) para decidir. Un límite que blue-green no resuelve: las dos versiones comparten la misma base, así que un cambio de esquema tendría que ser compatible hacia atrás.
+
+**Plan de rollback actual (probado una vez de verdad).** Con PROD en el commit B (`e674082`), volví al commit A (`d0a9fa8`):
+1. Decido volver atrás y registro la hora (`$t0`).
+2. Re-ejecuto solo el job `deploy-prod` de la corrida de A, que usa las imágenes ya verificadas de ese commit.
+3. El job queda en espera de aprobación y lo apruebo.
+4. El job baja las imágenes, recrea los contenedores y corre el smoke con reintentos.
+5. Verifico con `docker ps` que los contenedores `prod-...` vuelven a `sha-d0a9fa8`.
+
+Tiempos medidos (hora local): el deploy del rollback tardó **1 min 1 s** (inicio 23:55:58, fin 23:56:59). Desde que decidí volver atrás hasta que PROD respondió pasaron **2 min 55 s** (23:54:04 a 23:56:59), de los cuales **1 min 25 s** fueron esperar mi propia aprobación y **29 s** pasaron entre aprobar y que arrancara el job. El rastro es el intento 3 de la corrida: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/39773269184/attempts/3
+
+Esto ejercita la métrica DORA **tiempo de recuperación** (*time to restore service*). Dos límites: el rollback de código **no deshace los datos** de PROD, porque el volumen de Mongo no se toca (para eso haría falta un backup o migraciones reversibles), y el smoke no dice qué versión corre, por eso lo verifiqué en la etiqueta de la imagen.
+
+### 9. Problemas encontrados y cómo los resolví
+- En el runner de Windows, `bash` es el lanzador de WSL y fallaba con `HCS_E_CONNECTION_TIMEOUT`; pasé los pasos del deploy a PowerShell.
+- El front tenía la URL del backend dentro de la imagen; la pasé a una variable que se lee al arrancar.
+- Un bloque pegado dos veces duplicó el job `deploy-qa`; desde entonces reviso `git diff` antes de cada commit.
+- Usar el mismo puerto en QA y PROD hacía que chocaran; les puse puertos y nombre de proyecto de compose distintos.
+- Atlas y Render no encajaban con una base que es un contenedor, así que elegí el plan local.
+
+### Declaración de uso de IA
+Usé Claude como guía para interpretar la consigna, armar el workflow de deploy, los `compose` y el proxy, y diagnosticar errores. Cómo lo verifiqué: ejecuté cada paso en mi máquina, revisé el `git diff` antes de cada commit, comprobé con `docker ps` la etiqueta de las imágenes en cada entorno, y probé el rechazo, la aprobación y el rollback en Actions. Puedo explicar qué pasa entre el merge y PROD: el merge dispara el CI; si los dos builds pasan, publican las imágenes con el commit; `deploy-qa` las baja y las levanta en mi runner y corre el smoke; `deploy-prod` espera mi aprobación y recién entonces hace lo mismo con `compose.prod.yml`.
