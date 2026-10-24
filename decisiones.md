@@ -1,3 +1,33 @@
+
+
+
+
+
+## Enlaces del TP7
+
+**Paquetes públicos** (se bajan con `docker pull` sin credenciales, etiquetados con el commit sobre el que va `v7.0.0`):
+- ghcr.io/pedrogiussano2102407/ingsoft3-tp01-backend:sha-47327f08e08abd6cc4fdb4f1e3995bba335e9f26
+- ghcr.io/pedrogiussano2102407/ingsoft3-tp01-frontend:sha-47327f08e08abd6cc4fdb4f1e3995bba335e9f26
+
+**Corrida con la integración en VERDE y la e2e en ROJO:**
+- Commit que rompió la app: `9f61714839e0445e9d7eb56637f9bc617070e2ca` (PR #34: el botón «Submit» pasa a «Enviar» en `tp2-invento/client/pages/edit/category.tsx`; no toca `e2e/`)
+- Corrida: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/40037895128
+- Los dos reportes están como artefactos al pie de esa corrida: `playwright-report-integracion` (verde) y `playwright-report-e2e` (rojo, con captura y traza del fallo)
+
+**Corrida completa en verde, hasta PROD:**
+- El arreglo (PR #35, revierte el botón): https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/40081577354
+- La corrida final, de la que sale `v7.0.0`: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/40082541305
+
+**Entornos** (corren en mi máquina, vivos hasta la defensa):
+- QA: http://localhost:3000 (API: http://localhost:3001)
+- PROD: http://localhost:3010 (API: http://localhost:3011)
+
+**Release:** https://github.com/Pedrogiussano2102407/ingsoft3-tp01/releases/tag/v7.0.0
+
+
+*************************************************************************************************************************************
+
+
 ## Enlaces de este TP (TP6)
 
 **Paquetes públicos** (se bajan con `docker pull` sin credenciales, etiquetados con el commit de un merge):
@@ -433,7 +463,7 @@ Render reconstruiría la imagen desde el repo, y esa imagen podría no ser la qu
 Prueba que un pedido atraviesa front, proxy, backend y Mongo y que responde `200`. Reintenta porque el arranque de los contenedores no es instantáneo. No dice **qué versión** corre: eso se verifica en la etiqueta de la imagen con `docker ps`.
 
 ### Qué quedó por variable y qué quedó dentro de la imagen
-La dirección del backend (`BACKEND_URL`) **no** está dentro de la imagen del front: se lee del entorno al arrancar, en la plantilla de nginx. Por eso la misma imagen sirve en QA y en PROD y cada una habla con su API. Por entorno también cambian los puertos, el nombre del proyecto de compose, la base de datos y la `ADMIN_KEY`. Dentro de la imagen queda el código y el build de cada servicio. Separar así la configuración del artefacto es lo que permite promover la misma imagen de un entorno a otro.
+La dirección del backend (`BACKEND_URL`) **no** está dentro de la imagen del front: se lee del entorno al arrancar, en la ruta proxy de Next.js (`pages/api/[[...path]].ts`). Por eso la misma imagen sirve en QA y en PROD y cada una habla con su API. Por entorno también cambian los puertos, el nombre del proyecto de compose, la base de datos y la `ADMIN_KEY`. Dentro de la imagen queda el código y el build de cada servicio. Separar así la configuración del artefacto es lo que permite promover la misma imagen de un entorno a otro.
 
 ### Entornos: el fallback local
 Elegí el plan local documentado: un runner propio en mi máquina y un `docker compose` por entorno, cada uno con su Mongo y su volumen (`invento_qa` e `invento_prod`). El deploy lo dispara el pipeline, no un `docker compose up` manual. Descarté Atlas y Render porque la base es un contenedor desde el TP2.
@@ -461,3 +491,72 @@ Esto ejercita la métrica DORA **tiempo de recuperación** (*time to restore ser
 
 ### Declaración de uso de IA
 Usé Claude como guía para interpretar la consigna, armar el workflow de deploy, los `compose` y el proxy, y diagnosticar errores. Cómo lo verifiqué: ejecuté cada paso en mi máquina, revisé el `git diff` antes de cada commit, comprobé con `docker ps` la etiqueta de las imágenes en cada entorno, y probé el rechazo, la aprobación y el rollback en Actions. Puedo explicar qué pasa entre el merge y PROD: el merge dispara el CI; si los dos builds pasan, publican las imágenes con el commit; `deploy-qa` las baja y las levanta en mi runner y corre el smoke; `deploy-prod` espera mi aprobación y recién entonces hace lo mismo con `compose.prod.yml`.
+
+
+
+
+
+
+
+---
+
+## TP7 — Contenedores en el pipeline + integración y e2e
+
+### 1. Build once, deploy many
+La imagen se construye una sola vez, en `build-backend` y `build-frontend`, y se publica con el commit como etiqueta (`sha-<commit>`) solo cuando el cambio entra a `main`. QA y PROD no construyen nada: bajan esa imagen y la ejecutan, con el mismo `IMAGE_TAG` (`github.sha`) en los dos deploys. En mi plan local los `compose` ya usaban `image:` desde el TP6, así que no tuve el problema del proveedor que reconstruye. Lo que evita igual es que cada entorno arme su propia imagen con `build:` en mi máquina. Un ejemplo de mi proyecto: mi Dockerfile parte de `node:20-alpine`, una etiqueta que se mueve. Si PROD reconstruyera una semana después podría traer otra base y comportarse distinto que QA con el mismo código. Con una sola imagen, lo que probó QA es la misma imagen que corre en PROD.
+
+### 2. Estrategia de etiquetas
+- `sha-<commit>` en el registry identifica qué commit produjo cada imagen. Se lee en `docker ps`, en el log del deploy y en el paquete. Es la que uso para promover, porque es exacta.
+- `v7.0.0` en git es el nombre de una versión que sabemos que anduvo en PROD. Sirve para nombrar y encontrar, y va sobre el commit que *Deployments* dice que está en PROD, no sobre el último de `main`.
+- Mi pipeline **no publica `latest`**: es un puntero que se mueve, y con él no podría saber qué corre ni a qué volver.
+- Límite: un `sha-<commit>` se puede volver a publicar si re-ejecuto la corrida de ese commit. Lo que no se mueve es el digest (`@sha256:…`), que no usé.
+- No uso Render: los `compose` reciben la etiqueta por variable en cada deploy, así que no hay una imagen vieja configurada en ningún lado.
+
+### 3. De la release a la imagen, en un paso
+`git rev-list -n1 v7.0.0` da el commit, y la imagen es `sha-<ese commit>`, en los dos paquetes. Para volver a ella re-ejecuto el job `deploy-prod` de la corrida de ese commit, como hice en el rollback del TP6.
+
+### 4. Cómo compruebo que un entorno ejecuta la imagen
+Desde afuera, con el repo público: en *Actions*, el paso «Desplegar QA con la imagen de este commit» muestra el `docker compose pull` y el `IMAGE_TAG` de esa corrida, y *Deployments* muestra el commit de cada entorno. En mi máquina, `docker ps` muestra la etiqueta de cada contenedor. El smoke test solo pregunta si responde con 200: no dice qué versión corre ni si la app funciona. En la corrida roja el smoke dio verde con el botón roto.
+
+### 5. Qué pruebas elegí y qué dejé afuera
+**Integración** (`api.spec.js`, contra la api de QA, sin navegador y sin dobles):
+1. Alta, lectura y baja: crea una categoría con nombre único, la encuentra en `/categories`, la borra con la clave y comprueba que ya no está.
+2. Nombre de 2 caracteres: la api contesta 400 y el total de categorías no cambia.
+3. Nombre repetido (la elegí yo): la api contesta 403 y queda una sola. Es una regla que decide una consulta a la base, y solo una prueba contra la base real la ve. Si se rompe, le escribe a quien toque la creación de categorías en el backend.
+
+**e2e** (`ui.spec.js`, Playwright con Chromium, contra el front de QA):
+1. Crear una categoría desde el formulario, verla en la lista, borrarla desde la tabla y comprobar que la fila ya no está.
+2. Un nombre de 2 caracteres: el usuario ve «Name must have at least 3 characters» y no se crea nada.
+3. Borrar desde la tabla (la elegí yo): el navegador pide la clave con un cuadro nativo, la manda a la api y la fila desaparece. La elegí porque cruza ese cuadro, la clave de admin, la api y la base, y es el único camino que las pruebas unitarias del TP5 no ven.
+
+Lo que **no** puse: en integración no repito cada validación ni pruebo los ítems; en e2e no repito las reglas de la api, que ya cubre la integración, ni recorro todo el CRUD de ítems ni los gráficos. Esas partes no tienen prueba de integración ni e2e. La lógica pura del cliente la cubren los unitarios del TP5. Es la forma de la pirámide: muchas pruebas rápidas abajo y pocas de punta a punta arriba.
+
+Cada prueba que crea datos usa un nombre con la hora adentro, porque QA es uno solo y lo comparten todas las corridas. Después de cada prueba, un `afterEach` borra lo que quedó y comprueba que no queda nada.
+
+### 6. Integración y e2e: el par verde/rojo, y el gate
+En la corrida roja (commit `9f61714`, el texto del botón «Submit» pasó a «Enviar») la cadena dio: builds en verde, smoke en verde, **integración en verde**, **e2e en rojo** y `deploy-prod` sin arrancar. Eso dice quién falló: la api y la base respondían bien, porque la integración les habla directo, así que lo roto estaba entre el usuario y la api, o sea el front. No hizo falta leer código: el log de la e2e decía que esperaba un botón llamado «Submit». Si hubiera roto la api, la integración habría salido roja y la e2e ni habría corrido, porque depende de ella. El diff de ese commit toca `category.tsx` y no toca `e2e/`.
+
+El gate es la cadena de `needs`: `integracion` espera a `deploy-qa`, `e2e` a `integracion` y `deploy-prod` a `e2e`. En ese tramo no hay `continue-on-error`, ni `|| true`, ni `if: always()` en `deploy-prod`. El reporte de cada suite se sube como artefacto aun cuando la prueba falla.
+
+### 7. Por qué mi integración es la amplia
+Le pega a la api de QA ya desplegada, y no a una base temporal levantada dentro del job. Gana que prueba lo que realmente se desplegó: la imagen publicada, las variables, el secret y la base real. Pierde velocidad, depende de que QA esté arriba, y comparte estado con otras corridas, por eso los nombres únicos y la limpieza. Un fallo puede ser del entorno y no del código.
+
+### 8. Tiempos de espera y pruebas flaky
+No uso un free tier: todo corre local. Lo equivalente al cold start es el arranque de los contenedores después de recrearlos: el smoke de `deploy-qa` reintenta hasta 30 veces cada 5 segundos antes de que corran las pruebas, y cada prueba de Playwright tiene 30 segundos. Dejé `retries: 0` a propósito. Un test *flaky* es el que a veces pasa y a veces falla sin que cambie el código, y un reintento automático lo esconde. Prefiero que un rojo se vea como rojo. El costo es que la e2e roja tardó unos 2 minutos, porque cada prueba agotó sus 30 segundos esperando el botón.
+
+### 9. Cómo logré que la misma imagen del front sirva en QA y PROD
+La dirección del backend la lee el proxy del front (`pages/api/[[...path]].ts`) de la variable `BACKEND_URL` al arrancar, y no se compila en la imagen. Lo que cambia por entorno lo configura cada `compose`: puertos, nombre del proyecto, base de datos y `ADMIN_KEY`. Lo que queda dentro de la imagen es el código compilado.
+
+### 10. Límite conocido de mi cadena
+QA es uno solo. Si mergeo dos cambios seguidos, el `deploy-qa` del segundo recrea los contenedores mientras la e2e del primero todavía corre, y esa e2e termina probando en parte la imagen del segundo. Lo reconocería mirando en *Actions* a qué hora corrió cada `deploy-qa` y con `docker ps` qué etiqueta tiene QA. Qué haría: rechazar con motivo la corrida del primero y quedarme con la del segundo, sin re-ejecutar sus jobs de prueba. Y la regla que sigo es un merge por vez, esperando a que termine la cadena. Mi workflow no tiene un bloque `concurrency`, así que nada lo impide por sí solo. Lo que haría un equipo real es un entorno por corrida.
+
+### 11. Problemas encontrados y cómo los resolví
+- `npm run test:ci` no corre en PowerShell, porque `${COVERAGE_DIR:-coverage}` es sintaxis de `sh` y PowerShell no la expande. En CI sí funciona, porque corre dentro de la imagen. Comprobé la cobertura en mi máquina con `npx vitest run --coverage --coverage.reportsDirectory=coverage`.
+- Vitest levanta por defecto cualquier archivo `*.spec.js`, y habría intentado correr las pruebas de Playwright y roto el CI del TP5. Lo resolví excluyendo `e2e/**` en `vitest.config.mts`.
+- Instalar Playwright en el `package.json` del cliente habría cambiado el `package-lock.json` y entrado a la imagen. Lo puse en un paquete aparte dentro de `e2e/` y agregué `e2e` al `.dockerignore`, así la imagen quedó igual.
+- El runner propio puede estar apagado y los jobs quedarían esperando. Antes de cada merge compruebo que esté `online` y que los seis contenedores estén arriba.
+- La `ADMIN_KEY` es un secret del environment `qa`, así que los jobs de pruebas declaran `environment: qa`. En mi máquina la cargo con un cuadro de entrada que no muestra lo que escribo.
+- Al releer la consigna vi que mis primeras pruebas no comprobaban la limpieza y que la e2e de creación no borraba lo que creaba. Lo corregí antes de poner el tag.
+
+### 12. Declaración de uso de IA
+Usé Claude para interpretar la consigna, escribir las dos suites de Playwright, armar los jobs `integracion` y `e2e` del workflow y diagnosticar errores. También redactó el borrador de este texto a partir de lo que hicimos, y lo leí y ajusté para poder defenderlo. Cómo lo verifiqué: corrí cada suite en mi máquina contra QA (3 de 3 y 3 de 3), comprobé en *Actions* que la cadena se ejecuta en el orden esperado, provoqué la rotura en el código de la aplicación y no en las pruebas, y confirmé con `docker ps` la etiqueta de las imágenes en cada entorno. Puedo explicar qué pasa entre el merge y PROD: los builds publican las imágenes con el commit, `deploy-qa` las baja y corre el smoke, `integracion` y `e2e` prueban QA, y solo si las dos pasan `deploy-prod` espera mi aprobación y despliega la misma imagen.
