@@ -23,11 +23,15 @@ test.beforeAll(() => {
 
 // Cada prueba limpia lo que creó, pase o falle.
 test.afterEach(async ({ request }) => {
-  const todas = await listar(request);
-  for (const c of todas.filter((c) => creadas.includes(c.name))) {
-    await borrar(request, c._id);
-  }
+  const nombres = [...creadas];
   creadas.length = 0;
+  const todas = await listar(request);
+  for (const c of todas.filter((c) => nombres.includes(c.name))) {
+    const r = await borrar(request, c._id);
+    expect(r.status()).toBe(200);
+  }
+  const quedan = (await listar(request)).filter((c) => nombres.includes(c.name));
+  expect(quedan).toHaveLength(0);
 });
 
 test("alta, lectura y baja de una categoria contra la base real", async ({ request }) => {
