@@ -19,11 +19,15 @@ test.beforeAll(() => {
 
 // Cada prueba limpia lo que creo, pase o falle (si ya la borro la prueba, no hay nada que hacer).
 test.afterEach(async ({ request }) => {
-  const todas = await listar(request);
-  for (const c of todas.filter((c) => creadas.includes(c.name))) {
-    await request.post(`${API}/category/${c._id}/delete`, { data: { password: ADMIN_KEY } });
-  }
+  const nombres = [...creadas];
   creadas.length = 0;
+  const todas = await listar(request);
+  for (const c of todas.filter((c) => nombres.includes(c.name))) {
+    const r = await request.post(`${API}/category/${c._id}/delete`, { data: { password: ADMIN_KEY } });
+    expect(r.status()).toBe(200);
+  }
+  const quedan = (await listar(request)).filter((c) => nombres.includes(c.name));
+  expect(quedan).toHaveLength(0);
 });
 
 test("crear una categoria desde el formulario la muestra en la lista", async ({ page }) => {
@@ -37,6 +41,11 @@ test("crear una categoria desde el formulario la muestra en la lista", async ({ 
 
   await expect(page).toHaveURL(/\/categories/);
   await expect(page.getByRole("row").filter({ hasText: nombre })).toBeVisible();
+  // borrarla desde la tabla y comprobar que la fila desaparece
+  page.once("dialog", (dialogo) => dialogo.accept(ADMIN_KEY));
+  const filaCreada = page.getByRole("row").filter({ hasText: nombre });
+  await filaCreada.getByRole("button", { name: "Delete" }).click();
+  await expect(filaCreada).toHaveCount(0);
 });
 
 test("un nombre de 2 caracteres muestra el error y no crea nada", async ({ page, request }) => {
