@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Backend (Express)
+  - package-ecosystem: "npm"
+    directory: "/tp2-invento/server"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+
+  # Frontend (Next.js)
+  - package-ecosystem: "npm"
+    directory: "/tp2-invento/client"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+
+  # Acciones de los workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
