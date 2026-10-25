@@ -560,3 +560,41 @@ QA es uno solo. Si mergeo dos cambios seguidos, el `deploy-qa` del segundo recre
 
 ### 12. Declaración de uso de IA
 Usé Claude para interpretar la consigna, escribir las dos suites de Playwright, armar los jobs `integracion` y `e2e` del workflow y diagnosticar errores. También redactó el borrador de este texto a partir de lo que hicimos, y lo leí y ajusté para poder defenderlo. Cómo lo verifiqué: corrí cada suite en mi máquina contra QA (3 de 3 y 3 de 3), comprobé en *Actions* que la cadena se ejecuta en el orden esperado, provoqué la rotura en el código de la aplicación y no en las pruebas, y confirmé con `docker ps` la etiqueta de las imágenes en cada entorno. Puedo explicar qué pasa entre el merge y PROD: los builds publican las imágenes con el commit, `deploy-qa` las baja y corre el smoke, `integracion` y `e2e` prueban QA, y solo si las dos pasan `deploy-prod` espera mi aprobación y despliega la misma imagen.
+## TP8 — Infraestructura como Código
+
+Release: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/releases/tag/v8.0.0 · PR de `infra/`: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/pull/38 · commit `9a4cd8e41cedda4ccb858b6bb81a273e7fba783f`.
+
+### 1. Riel y versiones
+Plan C de la guía: Terraform con el provider de Docker, sobre mi entorno local (QA y PROD siguen siendo compose, corriendo en mi máquina). Terraform **1.16.6**, instalado con winget, y el provider `kreuzwerker/docker` fijado en **4.6.0** (versión exacta en `main.tf`, no un rango). El `.terraform.lock.hcl` está commiteado, con `constraints = "4.6.0"`. En Windows el provider se conecta al daemon por el named pipe (`npipe:////./pipe/docker_engine`).
+
+### 2. Qué declara `infra/` y qué decidí
+Preprod es un tercer entorno, al lado de QA y PROD, declarado en `infra/` (`main.tf`, `variables.tf`, `outputs.tf`): una red y un volumen propios, `mongo:7`, el backend y el frontend con las imágenes del TP7 (`sha-47327f08e08abd6cc4fdb4f1e3995bba335e9f26`, la de v7.0.0). Puertos 3020 (front) y 3021 (api); Mongo no publica ninguno, igual que en mis compose.
+- **Derivar, no copiar:** `MONGO_STRING` se arma con el nombre del contenedor de Mongo, y el `BACKEND_URL` del front con el nombre del contenedor del backend. De esas referencias Terraform deduce el orden.
+- **Sin credenciales en el código:** `ADMIN_KEY` entra por `TF_VAR_admin_key` y la variable es `sensitive` y no tiene default. Lo no secreto (imagen, repos, puertos) tiene default, así que alcanza con `terraform apply` con la clave exportada.
+- **Estado fuera del repo:** se pasa con `-backend-config` y vive en `$HOME/tfstate/preprod.tfstate`. El `.gitignore` cubre estado, `.terraform/` y tfvars, y estaba puesto antes del primer `apply`. El estado guarda todo en texto plano, claves incluidas.
+- **`keep_locally = true` en las imágenes:** un `destroy` no borra del daemon las imágenes que también usan QA y PROD.
+- **`wait = true` solo donde hay healthcheck** (Mongo y backend), como el `depends_on: service_healthy` de mis compose.
+
+### 3. Cómo comprobé que preprod es un entorno
+No me quedé en «8 recursos creados». Comprobé que la api de preprod responde (`/categories`, el mismo endpoint de mi healthcheck), que el mismo endpoint responde a través del proxy del front, que el front da 200 y que dentro del contenedor está `BACKEND_URL=http://preprod-backend:3001`. Como QA y preprod devolvían `[]`, no alcanzaba para distinguirlos: creé una categoría desde el front de preprod y apareció en la api de preprod (3021) y **no** en la de QA (3001). Eso prueba que cada entorno tiene su propia base y que el front habla con su propia api. Un `terraform plan` posterior dio «No changes».
+
+### 4. El ciclo destroy → apply
+Lo hice dos veces. Preprod desaparece entero (8 recursos, incluido el volumen, así que se va también el dato de prueba) y vuelve idéntico: mismos puertos, base vacía. El `apply` tarda alrededor de 30 segundos, casi todo esperando los healthchecks de Mongo y del backend. En cada vuelta, QA y PROD siguieron arriba sin reiniciarse y las imágenes `sha-47327f08…` siguieron en el daemon. El orden de destrucción que vi es el inverso al de creación: frontend, backend, Mongo y, al final, volumen y red. Lo decide Terraform a partir de las referencias del código, no el orden del archivo.
+
+### 5. Problemas encontrados y cómo los resolví
+- La guía de ejemplo asume .NET y Postgres; mi app es Next.js + Express + Mongo. Lo adapté leyendo mis `compose.qa.yml` y `compose.prod.yml` (healthchecks, `MONGO_STRING`, y que el front lee `BACKEND_URL` en runtime desde su proxy, así que la misma imagen sirve en cualquier entorno).
+- El primer `apply` quedó a medias: puse `wait = true` en el frontend, que no tiene healthcheck, y el provider falló al crearlo. El contenedor quedó marcado como *tainted* y el siguiente plan lo reemplazó (`1 to add, 1 to destroy`) sin tocar el resto. Saqué el `wait` del frontend, igual que en mi compose.
+- Como el front no tiene healthcheck, Terraform lo da por creado apenas arranca y la primera prueba dio `000` (no hay conexión). Espero unos 10 segundos antes de probarlo.
+- El lock quedó con `constraints = "~> 4.0"` aunque yo ya había fijado `4.6.0` en `main.tf`; `init` y `init -upgrade` no reescriben ese campo. Borré el lock y lo regeneré.
+- En PowerShell, `git rev-parse v8.0.0^{commit}` se rompe porque las llaves se interpretan como un bloque de código. Como el tag es liviano, alcanza con `git rev-parse v8.0.0`.
+
+### 6. Límites conocidos
+- Terraform solo gestiona preprod. QA y PROD siguen con compose y nada compara lo declarado con lo que corre ahí.
+- El estado es un archivo local, sin bloqueo ni copia. Si lo pierdo, Terraform no sabe que preprod existe y habría que borrar o importar los contenedores a mano.
+- `ADMIN_KEY` queda en texto plano en el estado: `sensitive` solo la oculta en el plan y los outputs. Por eso el estado está fuera del repo.
+- Preprod corre una imagen fija (`image_tag`) y no sigue a `main`; para probar otra versión hay que cambiar esa variable y se reemplazan los contenedores.
+- No hay pipeline que aplique `infra/`: el `apply` es manual, desde mi máquina.
+- Mergear `infra/` a `main` disparó la cadena normal: `deploy-qa` redesplegó QA con la imagen del nuevo commit y `deploy-prod` quedó esperando aprobación, que no di; PROD sigue en v7.0.0. No lo hizo Terraform: es el pipeline de siempre.
+
+### 7. Declaración de uso de IA
+Usé Claude para interpretar la consigna, guiarme paso a paso en una herramienta que no conocía, escribir el código de `infra/` adaptado a mi app y explicarme cada comando y cada plan. También redactó el borrador de este texto a partir de lo que hicimos, y lo leí y ajusté para poder defenderlo. Cómo lo verifiqué: leí cada `plan` antes de aplicar, corrí `destroy` y `apply` dos veces, comprobé con `docker ps` que QA y PROD no se reiniciaron, probé el aislamiento con una categoría creada en preprod que no apareció en QA, confirmé con `git rev-parse` que el tag apunta al commit del PR y revisé en *Actions* que `deploy-prod` quedó sin aprobar. Puedo explicar qué dice cada bloque de `main.tf`, por qué Terraform crea Mongo antes que el backend y destruye al revés, y leer un plan en voz alta.
