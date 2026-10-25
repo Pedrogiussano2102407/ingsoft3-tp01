@@ -12,13 +12,32 @@ import Header from "../components/HeaderMegaMenu";
 import Footer from "../components/FooterSimple";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { useDisclosure } from "@mantine/hooks";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import * as Sentry from "@sentry/react";
 
 export default function App({ Component, pageProps }: any) {
   const BACKEND_URL = "/api";
   const [modalOpened, modalHandler] = useDisclosure(false);
   const [modalText, setModalText] = useState("hello");
   const [loading, loadingHandler] = useDisclosure(false);
+
+  // Sentry en el navegador: el DSN llega en runtime desde /api/sentry-config.
+  // Sin DSN (QA) no se inicia y no se manda nada.
+  useEffect(() => {
+    fetch("/api/sentry-config")
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (cfg.dsn) {
+          Sentry.init({
+            dsn: cfg.dsn,
+            environment: cfg.environment,
+            integrations: [Sentry.browserTracingIntegration()],
+            tracesSampleRate: 1.0,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   function displayError(message: string) {
     // if error obtained, display error in modal

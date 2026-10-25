@@ -279,6 +279,9 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Desplegar PROD con la imagen verificada
+        env:
+          SENTRY_DSN_BACKEND: ${{ secrets.SENTRY_DSN_BACKEND }}
+          SENTRY_DSN_FRONTEND: ${{ secrets.SENTRY_DSN_FRONTEND }}
         shell: powershell
         run: |
           docker compose -f tp2-invento/compose.prod.yml pull
