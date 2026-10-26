@@ -22,7 +22,7 @@ jobs:
         run: echo "Rama $RAMA · commit $GITHUB_SHA"
 
       - name: Bajar el código al runner
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Preparar constructor con soporte de cache
         uses: docker/setup-buildx-action@v4
@@ -93,7 +93,7 @@ jobs:
         run: echo "Rama $RAMA · commit $GITHUB_SHA"
 
       - name: Bajar el código al runner
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Preparar constructor con soporte de cache
         uses: docker/setup-buildx-action@v4
@@ -162,7 +162,7 @@ jobs:
       ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
     steps:
       - name: Bajar el codigo al runner
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Desplegar QA con la imagen de este commit
         shell: powershell
@@ -203,7 +203,7 @@ jobs:
         working-directory: tp2-invento/client/e2e
     steps:
       - name: Bajar el codigo al runner
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Instalar las pruebas
         shell: powershell
@@ -242,7 +242,7 @@ jobs:
         working-directory: tp2-invento/client/e2e
     steps:
       - name: Bajar el codigo al runner
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Instalar las pruebas
         shell: powershell
@@ -276,7 +276,7 @@ jobs:
       ADMIN_KEY: ${{ secrets.ADMIN_KEY }}
     steps:
       - name: Bajar el codigo al runner
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Desplegar PROD con la imagen verificada
         env:
