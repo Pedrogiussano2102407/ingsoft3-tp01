@@ -30,10 +30,6 @@ app.get("/health", (req, res) => {
   res.status(dbOk ? 200 : 503).json({ status: dbOk ? "ok" : "db-down" });
 });
 
-// TEMPORAL (TP9): error de prueba para Sentry. Se saca al cerrar el practico.
-app.get("/debug-sentry", () => {
-  throw new Error("Error de prueba de Sentry (TP9)");
-});
 
 app.use("/", indexRouter);
 
