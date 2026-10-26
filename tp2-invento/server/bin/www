@@ -4,6 +4,7 @@
  * Module dependencies.
  */
 
+require('../instrument');
 const app = require('../app');
 const debug = require('debug')('server:server');
 const http = require('http');
