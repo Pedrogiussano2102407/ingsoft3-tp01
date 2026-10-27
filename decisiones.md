@@ -1,7 +1,12 @@
+## Enlaces del TP9
+- Release v9.0.0: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/releases/tag/v9.0.0
+- PR de Dependabot mergeado (#45): https://github.com/Pedrogiussano2102407/ingsoft3-tp01/pull/45
+- PR de Sentry (#49): https://github.com/Pedrogiussano2102407/ingsoft3-tp01/pull/49
+- Corrida de deploy a PROD con Sentry: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/40256031783
+- Primer análisis de CodeQL: https://github.com/Pedrogiussano2102407/ingsoft3-tp01/actions/runs/40394748996
 
 
-
-
+************************************************************************************************
 
 ## Enlaces del TP7
 
@@ -598,3 +603,33 @@ Lo hice dos veces. Preprod desaparece entero (8 recursos, incluido el volumen, a
 
 ### 7. Declaración de uso de IA
 Usé Claude para interpretar la consigna, guiarme paso a paso en una herramienta que no conocía, escribir el código de `infra/` adaptado a mi app y explicarme cada comando y cada plan. También redactó el borrador de este texto a partir de lo que hicimos, y lo leí y ajusté para poder defenderlo. Cómo lo verifiqué: leí cada `plan` antes de aplicar, corrí `destroy` y `apply` dos veces, comprobé con `docker ps` que QA y PROD no se reiniciaron, probé el aislamiento con una categoría creada en preprod que no apareció en QA, confirmé con `git rev-parse` que el tag apunta al commit del PR y revisé en *Actions* que `deploy-prod` quedó sin aprobar. Puedo explicar qué dice cada bloque de `main.tf`, por qué Terraform crea Mongo antes que el backend y destruye al revés, y leer un plan en voz alta.
+
+
+
+*****************************************************************
+## TP9 – DevSecOps y observabilidad
+
+### Dependabot y seguridad
+- Push protection y secret scanning estaban activos (lo verifiqué con `gh api`). El 26-oct activé por API Dependabot alerts y Dependabot security updates, y CodeQL con el default setup a las 17:20; el primer análisis terminó a las 17:23 (unos 3 minutos) con dos análisis publicados (actions y javascript-typescript) y 7 alertas. No corregí ninguna en este TP.
+- Configuré dependabot.yml para npm (server y client) y github-actions; e2e quedó afuera. Dependabot abrió 8 PRs.
+- Mergeé el PR #45 (cors 2.8.5 → 2.8.6, parche del backend) el 25-oct: merge a las 11:39, integración verde a las 11:43 y e2e verde a las 11:48 (hora local). El primer intento lo corté yo antes de la e2e y repetí esos jobs. El lock figuraba con unas 20 mil líneas cambiadas pero era sangría; el cambio real fue de 19 líneas. Dependabot avisó un publicador nuevo en npm (ulisesgascon); comprobé que es quien hizo el PR "Release: 2.8.6" en expressjs/cors. Dejé abiertos los otros siete porque son saltos de versión mayor o dependencias de desarrollo.
+-- Al activar las alertas, GitHub informó 190 vulnerabilidades en la rama por defecto (16 críticas, 76 altas, 80 moderadas y 18 bajas), repartidas entre las dependencias de server, client y e2e. No las corregí en este TP: son saltos de versión que pueden romper la app, y `npm audit fix --force` no se recomienda sin revisar cada cambio.
+
+### Observabilidad
+- Sentry (PR #49, commit 49d45bc2) con @sentry/node y @sentry/react. El DSN está solo en PROD, a través de los secrets SENTRY_DSN_BACKEND y SENTRY_DSN_FRONTEND del environment production; QA no reporta. El deploy a PROD de ese commit corrió de 23:03:11 a 23:04:33 (25-oct, hora local).
+- Verifiqué que Sentry recibía eventos con una ruta temporal /debug-sentry, que quedó registrada como INVENTO-BACKEND-1. Después la saqué en otro PR y desplegué a PROD con aprobación: PROD corre la imagen sha-4727667a0650be0fcdd5c0734be838ed43d258f0 y /debug-sentry devuelve 404.
+- En Sentry (invento-backend, últimas 24 h, ignorando GET /health): la operación más usada es GET /categories, con 2.759 requests (p50 5,8 ms, p95 14,3 ms). La más lenta es POST /item/create con 43,1 ms, aunque con un solo request; con algo más de muestra, POST /category/create (4 requests, p95 39,4 ms). Hay además 23 transacciones llamadas solo "GET", que probablemente son rutas sin coincidencia.
+- De ese dato salió una tarjeta en el tablero del TP3: "Investigar por que GET /categories concentra casi todo el trafico del backend", para revisar si el frontend lo pide en cada página y si conviene cachearlo.
+- UptimeRobot monitorea /health a través de un túnel de Cloudflare hacia el backend de PROD. Caída provocada el 26-oct (hora local): parada con docker stop a las 17:32 y aviso DOWN a las 17:35 (3 minutos); arranque a las 17:35 y aviso UP a las 17:40 (5 minutos). Después pausé el monitor y cerré el túnel.
+
+### Release
+- Tag y release v9.0.0 sobre el commit 4727667a0650be0fcdd5c0734be838ed43d258f0, que es el que corre en PROD (backend y frontend con la misma imagen sha-4727667a…).
+
+### Problemas
+- El instalador .msi de cloudflared por winget pidió un PIN y falló con el error 1602; usé el .exe directo.
+- El túnel rápido de Cloudflare es temporal: el 26-oct a las 17:24 lo encontré caído ("Tunnel not found"), lo reinicié a las 17:26 y tuve que actualizar la URL del monitor, porque cambia en cada arranque.
+- En PowerShell 5.1 se pierden las comillas dobles al llamar programas, así que el chequeo de variables de entorno con `test -n "$VAR"` daba un falso "configurado"; lo resolví leyendo la variable con `printenv`.
+- Al principio las búsquedas de Sentry no mostraban datos porque filtraba por `/health` y la transacción se llama `GET /health`.
+
+### Uso de IA
+Usé Claude (Anthropic) como asistente a lo largo del TP9: me explicó cada paso y me pasó los comandos de PowerShell, me ayudó a analizar el PR #45 de Dependabot, a diseñar la integración de Sentry en backend y frontend, a diagnosticar problemas (el túnel de Cloudflare, el chequeo de variables en PowerShell, la búsqueda de transacciones en Sentry) y a redactar este documento. Yo ejecuté cada comando, revisé las salidas y las capturas, tomé las decisiones finales y verifiqué por API y en la consola de cada herramienta que lo pedido estuviera activo.
